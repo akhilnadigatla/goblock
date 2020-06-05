@@ -9,110 +9,119 @@ import (
 const dbFile = "chain.db"
 const bucket = "blocks"
 
-// Chain composed of a list of blocks
-type chain struct {
+type Chain struct {
 	tip []byte
 	db  *bolt.DB
 }
 
-// Structurre to iterate over blocks
-type iterator struct {
+type Iterator struct {
 	currHash []byte
-	db 	 *bolt.DB
+	db	 *bolt.DB
 }
 
-// Add a new block to the end of the chain
-func (chain *chain) addBlock(data string) {
+func (chain *Chain) AddBlock(data string) {
 	var lastHash []byte
 	
-	err := chain.db.View(func(tx *bolt.Tx) error {
+	err := chain.db.View(
+	func (tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		lastHash = b.Get([]byte("l"))
+		
 		return nil
 	})
 	if err != nil {
 		log.Panic(err)
 	}
+	
+	newBlock := NewBlock(data, lastHash)
 
-	newBlock := newBlock(data, lastHash)
-
-	err := chain.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucket))
-		err := b.Put(newBlock.currHash, newBlock.blockToBytes())
+	err = chain.db.Update(
+	func (tx *bolt.Tx) error {
+		b:= tx.Bucket([]byte(bucket))
+		
+		err := b.Put(newBlock.CurrHash, newBlock.BlockToBytes())
 		if err != nil {
 			log.Panic(err)
 		}
-		err = b.Put([]byte("l"), newBlock.currHash)
+		
+		err = b.Put([]byte("l"), newBlock.CurrHash)
 		if err != nil {
 			log.Panic(err)
 		}
-		chain.tip = newBlock.currHash
+
+		chain.tip = newBlock.CurrHash
+		
 		return nil
 	})
-	if err != nil {
-		log.Panic(err)
-	}
 }
 
-func (chain *chain) iterator() *iterator {
-	iter := &iterator{chain.tip, chain.db}
-	
+func (chain *Chain) Iterator() *Iterator {
+	iter := &Iterator{chain.tip, chain.db}
 	return iter
 }
 
-func (iter *iterator) next() *block {
-	var block *block
-
-	err := iter.db.View(func(tx *bolt.Tx) error {
+func (iter *Iterator) Next() *Block {
+	var block *Block
+	
+	err := iter.db.View(
+	func (tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		encBlock := b.Get(iter.currHash)
-		block = bytesToBlock(encBlock)
+		block = BytesToBlock(encBlock)
+		
 		return nil
 	})
 	if err != nil {
 		log.Panic(err)
 	}
-	
-	iter.currHash = block.prevHash
+
+	iter.currHash = block.PrevHash
 	
 	return block
 }
 
-// Create a new blockchain
-func newChain() *chain {
+func NewChain() *Chain {
 	var tip []byte
 	db, err := bolt.Open(dbFile, 0600, nil)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	err = db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(
+	func (tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
+		
 		if b == nil {
-			fmt.Println("No existing blockhain found. Creating a new one...")
-			first := newFirstBlock()
+			fmt.Println("No existing blockchain found. Creating a new one...")
+			genesis := NewGenesisBlock()
+
 			b, err := tx.CreateBucket([]byte(bucket))
 			if err != nil {
 				log.Panic(err)
 			}
-			err = b.Put(first.currHash, first.blockToBytes())
+			
+			err = b.Put(genesis.CurrHash, genesis.BlockToBytes())
 			if err != nil {
 				log.Panic(err)
 			}
-			err = b.Put([]byte("l"), first.currHash)
+		
+			err = b.Put([]byte("l"), genesis.CurrHash)
 			if err != nil {
 				log.Panic(err)
 			}
-			tip = first.currHash
+			
+			tip = genesis.CurrHash
 		} else {
 			tip = b.Get([]byte("l"))
 		}
+
 		return nil
 	})
 	if err != nil {
 		log.Panic(err)
 	}
 
-	chain := chain{tip, db}
-	return &chain 
+	chain := Chain{tip, db}
+
+	return &chain
 }

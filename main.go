@@ -1,12 +1,7 @@
 package main
 
-import (
-	"fmt"
-	"strconv"
-)
-
 func main() {
-	chain := newChain()
+	chain := NewChain()
 	defer chain.db.Close()
 
 	cli := CLI{chain}

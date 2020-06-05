@@ -1,22 +1,21 @@
 package main
 
 import (
-	"time"
 	"bytes"
 	"encoding/gob"
 	"log"
+	"time"
 )
 
-// Block structure
-type block struct {
-	timeStamp int64  // Time of block creation
-	data      []byte // Information to be contained by block
-	prevHash  []byte // Hash of previous block
-	currHash  []byte // Hash of defined block
-	nonce	  int	 // Adjusted to ensure hash is less than target
+type Block struct {
+	Nonce     int
+	Timestamp int64
+	Data      []byte
+	PrevHash  []byte
+	CurrHash  []byte
 }
 
-func (block *block) blockToBytes() []byte {
+func (block *Block) BlockToBytes() []byte {
 	var bytes bytes.Buffer
 	encoder := gob.NewEncoder(&bytes)
 
@@ -28,8 +27,8 @@ func (block *block) blockToBytes() []byte {
 	return bytes.Bytes()
 }
 
-func bytesToBlock(seq []byte) *block {
-	var block block
+func BytesToBlock(seq []byte) *Block {
+	var block Block
 	decoder := gob.NewDecoder(bytes.NewReader(seq))
 
 	err := decoder.Decode(&block)
@@ -40,19 +39,17 @@ func bytesToBlock(seq []byte) *block {
 	return &block
 }
 
-// Create a new block
-func newBlock(data string, prevHash []byte) *block {
-	block := &block{time.Now().Unix(), []byte(data), prevHash, []byte{}, 0}
-	pow := newProof(block)
-	nonce, hash := pow.checkPOW()	
+func NewBlock(data string, prevHash []byte) *Block {
+	block := &Block{0, time.Now().Unix(), []byte(data), prevHash, []byte{}}
+	pow := NewProof(block)
+	nonce, hash := pow.CheckPOW()
 
-	block.currHash = hash[:]
-	block.nonce = nonce
+	block.Nonce = nonce
+	block.CurrHash = hash[:]
 
 	return block
 }
 
-// Create first block in a chain
-func newFirstBlock() *block {
-	return newBlock("First block", []byte{})
+func NewGenesisBlock() *Block {
+	return NewBlock("Genesis Block", []byte{})
 }

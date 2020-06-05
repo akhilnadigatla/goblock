@@ -6,14 +6,13 @@ import (
 	"log"
 )
 
-// Convert an integer to its hexadecimal bytes
-func intToHex(num int64) []byte {
-	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.BigEndian, num)
+func IntToHex(num int64) []byte {
+	buff := new(bytes.Buffer)
 	
+	err := binary.Write(buff, binary.BigEndian, num)
 	if err != nil {
 		log.Panic(err)
 	}
-	
-	return buf.Bytes()
+
+	return buff.Bytes()
 }

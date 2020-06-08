@@ -30,7 +30,7 @@ func NewProof(block *Block) *POW {
 
 func (pow *POW) CompileData(nonce int) []byte {
 	data := bytes.Join([][]byte{pow.block.PrevHash, 
-				    pow.block.Data,
+				    pow.block.HashTransactions(),
 				    IntToHex(pow.block.Timestamp),
 				    IntToHex(int64(targetBits)),
 				    IntToHex(int64(nonce)),
@@ -43,7 +43,7 @@ func (pow *POW) CheckPOW() (int, []byte) {
 	var hash [32]byte
 	nonce := 0
 	
-	fmt.Printf("Mining block with data '%s'\n", pow.block.Data)
+	fmt.Printf("Mining new block.")
 	for nonce < maxNonce {
 		data := pow.CompileData(nonce)
 		

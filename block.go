@@ -2,17 +2,30 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"log"
 	"time"
 )
 
 type Block struct {
-	Nonce     int
-	Timestamp int64
-	Data      []byte
-	PrevHash  []byte
-	CurrHash  []byte
+	Nonce        int
+	Timestamp    int64
+	Transactions []*Txn
+	PrevHash     []byte
+	CurrHash     []byte
+}
+
+func (block *Block) HashTransactions() []byte {
+	var txHashes [][]byte
+	var txHash [32]byte
+
+	for _, tx := range block.Transactions {
+		txHashes = append(txHashes, tx.ID)
+	}
+	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
+
+	return txHash[:]
 }
 
 func (block *Block) BlockToBytes() []byte {
@@ -39,8 +52,8 @@ func BytesToBlock(seq []byte) *Block {
 	return &block
 }
 
-func NewBlock(data string, prevHash []byte) *Block {
-	block := &Block{0, time.Now().Unix(), []byte(data), prevHash, []byte{}}
+func NewBlock(transactions []*Txn, prevHash []byte) *Block {
+	block := &Block{0, time.Now().Unix(), transactions, prevHash, []byte{}}
 	pow := NewProof(block)
 	nonce, hash := pow.CheckPOW()
 
@@ -50,6 +63,6 @@ func NewBlock(data string, prevHash []byte) *Block {
 	return block
 }
 
-func NewGenesisBlock() *Block {
-	return NewBlock("Genesis Block", []byte{})
+func NewGenesisBlock(coinbase *Txn) *Block {
+	return NewBlock([]*Txn{coinbase}, []byte{})
 }

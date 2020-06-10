@@ -16,6 +16,21 @@ type Block struct {
 	CurrHash     []byte
 }
 
+func NewBlock(transactions []*Txn, prevHash []byte) *Block {
+	block := &Block{0, time.Now().Unix(), transactions, prevHash, []byte{}}
+	pow := NewProof(block)
+	nonce, hash := pow.CheckPOW()
+
+	block.Nonce = nonce
+	block.CurrHash = hash[:]
+
+	return block
+}
+
+func NewGenesisBlock(coinbase *Txn) *Block {
+	return NewBlock([]*Txn{coinbase}, []byte{})
+}
+
 func (block *Block) HashTransactions() []byte {
 	var txHashes [][]byte
 	var txHash [32]byte
@@ -50,19 +65,4 @@ func BytesToBlock(seq []byte) *Block {
 	}
 
 	return &block
-}
-
-func NewBlock(transactions []*Txn, prevHash []byte) *Block {
-	block := &Block{0, time.Now().Unix(), transactions, prevHash, []byte{}}
-	pow := NewProof(block)
-	nonce, hash := pow.CheckPOW()
-
-	block.Nonce = nonce
-	block.CurrHash = hash[:]
-
-	return block
-}
-
-func NewGenesisBlock(coinbase *Txn) *Block {
-	return NewBlock([]*Txn{coinbase}, []byte{})
 }

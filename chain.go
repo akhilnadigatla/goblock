@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"crypto/ecdsa"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -22,8 +25,34 @@ type Iterator struct {
 	db	 *bolt.DB
 }
 
+func (chain *Chain) FindTxn(ID []byte) (Txn, error) {
+	iter := chain.Iterator()
+
+	for {
+		block := iter.Next()
+		
+		for _, tx := range block.Transactions {
+			if bytes.Compare(tx.ID, ID) == 0 {
+				return *tx, nil
+			}
+		}
+
+		if len(block.prevHash) == 0 {
+			break
+		}
+	}
+
+	return Transaction{}, errors.New("Transaction not found.")
+}
+
 func (chain *Chain) MineBlock(transactions []*Txn) {
 	var lastHash []byte
+
+	for _, txn := range transactions {
+		if chain.VerifyTxn(txn) != true {
+			log.Panic("Invalid transaction.")
+		}
+	}
 	
 	err := chain.db.View(
 	func (tx *bolt.Tx) error {
@@ -58,7 +87,35 @@ func (chain *Chain) MineBlock(transactions []*Txn) {
 	})
 }
 
-func (chain *Chain) FindUTxns(address string) []Txn {
+func (chain *Chain) SignTxn(txn *Txn, privKey ecdsa.PrivateKey) {
+	prevTxns := make(map[string]Txn)
+	
+	for _, vin := range txn.Vin {
+		prevTxn, err := chain.FindTxn(vin.Txid)
+		if err != nil {
+			log.Panic(err)
+		}
+		prevTxns[hex.EncodetoString(prevTxn.ID)] = prevTx
+	}
+
+	tx.Sign(privKey, prevTxns)
+}
+
+func (chain *Chain) VerifyTxn(txn *Txn) bool {
+	prevTxns := make(map[string]Txn)
+
+	for _, vin := range tx.Vin {
+		prevTxn, err := chain.FindTxn(vin.Txid)
+		if err != nil {
+			log.Panic(err)
+		}
+		prevTxns[hex.EncodeToString(prevTxn.ID)] = prevTxn
+	}
+
+	retur txn.Verify(prevTxns)
+}
+
+func (chain *Chain) FindUTxns(pubKeyHash []byte) []Txn {
 	var unspent []Txn
 	spent := make(map[string][]int)
 	iter := chain.Iterator()
@@ -79,14 +136,14 @@ func (chain *Chain) FindUTxns(address string) []Txn {
 					}
 				}
 				
-				if out.CanBeUnlockedWith(address) {
+				if out.IsLockedWith(pubKeyHash) {
 					unspent = append(unspent, *txn)
 				}
 			}
 
 			if txn.IsCoinbase() == false {
 				for _, in := range txn.Vin {
-					if in.CanUnlockOutputWith(address) {
+					if in.UsesKey(pubKeyHash) {
 						inTxnID := hex.EncodeToString(in.Txid)
 						spent[inTxnID] = append(spent[inTxnID], in.Vout)
 					}
@@ -103,13 +160,13 @@ func (chain *Chain) FindUTxns(address string) []Txn {
 	return unspent
 }
 
-func (chain *Chain) FindUTxnsO(address string) []TxOutput {
+func (chain *Chain) FindUTxnsO(pubKeyHash []byte) []TxOutput {
 	var UTxnsO []TxOutput
-	unspent := chain.FindUTxns(address)
+	unspent := chain.FindUTxns(pubKeyHash)
 
 	for _, txn := range unspent {
 		for _, out := range txn.Vout {
-			if out.CanBeUnlockedWith(address) {
+			if out.IsLockedWithKey(pubKeyHash) {
 				UTxnsO = append(UTxnsO, out)
 			}
 		}
@@ -210,6 +267,9 @@ func CreateChain(address string) *Chain {
 	}
 
 	var tip []byte
+	cbtx := NewCoinbaseTxn(address, genesisCoinbaseData)
+	genesis := NewGenesisBlock(cbtx)
+	
 	db, err := bolt.Open(dbFile, 0600, nil)
 	if err != nil {
 		log.Panic(err)
@@ -217,8 +277,6 @@ func CreateChain(address string) *Chain {
 	
 	err = db.Update(
 	func (tx *bolt.Tx) error {
-		cbtx := NewCoinbaseTxn(address, genesisCoinbaseData)
-		genesis := NewGenesisBlock(cbtx)
 
 		b, err := tx.CreateBucket([]byte(bucket))
 		if err != nil {

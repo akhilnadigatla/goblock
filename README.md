@@ -1,3 +1,4 @@
+# goblock
 A basic blockchain prototype built with Golang.
 
 A blockchain is a dynamic collection of records that are referred to as blocks. Each block is identified by a header, which consists of:
